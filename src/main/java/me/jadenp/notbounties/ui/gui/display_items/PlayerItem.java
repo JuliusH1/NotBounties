@@ -11,7 +11,6 @@ import me.jadenp.notbounties.features.LanguageOptions;
 import me.jadenp.notbounties.features.settings.money.NumberFormatting;
 import me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime;
 import me.jadenp.notbounties.utils.LoggedPlayers;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -41,14 +40,14 @@ public class PlayerItem implements DisplayItem, AmountItem {
             return item;
 
         String parsedName = parseText(headName, player);
-        meta.displayName(LanguageOptions.toComponent(parsedName));
+        meta.setDisplayName(CustomItem.toDisplayString(parsedName));
 
-        lore = new ArrayList<>(lore);
+        lore = new ArrayList<>(lore); // copy so we don't mutate the original
         lore.addAll(additionalLore);
-        List<Component> loreComponents = lore.stream()
-                .map(string -> LanguageOptions.toComponent(parseText(string, player)))
+        List<String> loreStrings = lore.stream()
+                .map(string -> CustomItem.toDisplayString(parseText(string, player)))
                 .toList();
-        meta.lore(loreComponents);
+        meta.setLore(loreStrings);
 
         if (customModelData != -1)
             meta.setCustomModelData(customModelData);

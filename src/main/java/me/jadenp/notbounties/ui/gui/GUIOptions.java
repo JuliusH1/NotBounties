@@ -1,18 +1,16 @@
 package me.jadenp.notbounties.ui.gui;
 
 import me.jadenp.notbounties.Leaderboard;
-import me.jadenp.notbounties.NotBounties;
 import me.jadenp.notbounties.data.Whitelist;
+import me.jadenp.notbounties.features.ConfigOptions;
+import me.jadenp.notbounties.features.LanguageOptions;
+import me.jadenp.notbounties.features.challenges.ChallengeManager;
+import me.jadenp.notbounties.features.settings.money.NumberFormatting;
 import me.jadenp.notbounties.ui.HeadFetcher;
 import me.jadenp.notbounties.ui.QueuedHead;
 import me.jadenp.notbounties.ui.gui.display_items.DisplayItem;
 import me.jadenp.notbounties.ui.gui.display_items.PlayerItem;
 import me.jadenp.notbounties.utils.DataManager;
-import me.jadenp.notbounties.features.challenges.ChallengeManager;
-import me.jadenp.notbounties.features.ConfigOptions;
-import me.jadenp.notbounties.features.LanguageOptions;
-import me.jadenp.notbounties.features.settings.money.NumberFormatting;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -21,8 +19,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.*;
-
-import static me.jadenp.notbounties.features.LanguageOptions.*;
 
 public class GUIOptions {
     private final List<Integer> playerSlots;
@@ -142,12 +138,8 @@ public class GUIOptions {
         return item;
     }
 
-    /**
-     * Build the title Component for the inventory.
-     * Supports MiniMessage tags as well as legacy &x color codes.
-     */
-    private Component buildTitleComponent(String rawTitle) {
-        return LanguageOptions.toComponent(rawTitle);
+    private static String buildTitleString(String rawTitle) {
+        return LanguageOptions.componentToLegacyString(LanguageOptions.toComponent(rawTitle));
     }
 
     /**
@@ -166,11 +158,10 @@ public class GUIOptions {
             page = 1;
         }
 
-        // Use Adventure API so MiniMessage tags in the title are properly rendered
-        Component titleComponent = buildTitleComponent(title);
+        String legacyTitle = buildTitleString(title);
         Inventory inventory = inventoryType == InventoryType.CHEST
-            ? Bukkit.createInventory(player, size, titleComponent)
-            : Bukkit.createInventory(player, inventoryType, titleComponent);
+                ? Bukkit.createInventory(player, size, legacyTitle)
+                : Bukkit.createInventory(player, inventoryType, legacyTitle);
 
         ItemStack[] contents = inventory.getContents();
         String[] replacements;

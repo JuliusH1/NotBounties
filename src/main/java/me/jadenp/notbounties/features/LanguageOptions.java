@@ -779,6 +779,16 @@ public class LanguageOptions {
         return textComponent;
     }
 
+    /**
+     * Serialize an Adventure Component to a §-coded legacy String compatible
+     * with Spigot's ItemMeta.setDisplayName() / setLore() / createInventory().
+     */
+    public static String componentToLegacyString(net.kyori.adventure.text.Component component) {
+        return net.kyori.adventure.platform.bukkit.BukkitComponentSerializer
+                .legacy()
+                .serialize(component);
+    }
+
     public static String parseImageURL(String url, UUID uuid, boolean skinLoaded) {
         if (url.contains("{any}")) {
             String identifier;

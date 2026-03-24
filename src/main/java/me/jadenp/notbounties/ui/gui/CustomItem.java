@@ -7,8 +7,6 @@ import me.jadenp.notbounties.features.ConfigOptions;
 import me.jadenp.notbounties.features.LanguageOptions;
 import me.jadenp.notbounties.ui.Head;
 import me.jadenp.notbounties.utils.DataManager;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
@@ -49,7 +47,6 @@ public class CustomItem {
         String mat = configurationSection.getString("material");
         if (mat != null) {
             if (mat.toLowerCase(Locale.ROOT).startsWith("nexo:")) {
-                // Nexo item — store the ID and keep material as STONE as a fallback
                 nexoId = mat.substring(5);
             } else if (mat.contains(" ") && mat.substring(0, mat.indexOf(" ")).equalsIgnoreCase("PLAYER_HEAD")) {
                 // has head data
@@ -134,12 +131,8 @@ public class CustomItem {
                 .replace("{gui}", guiType), player);
     }
 
-    /**
-     * Convert a parsed (color-coded) string to an Adventure Component.
-     * Supports both legacy (&x) codes and MiniMessage tags.
-     */
-    public static Component toComponent(String parsed) {
-        return LanguageOptions.toComponent(parsed);
+    public static String toDisplayString(String raw) {
+        return LanguageOptions.componentToLegacyString(LanguageOptions.toComponent(raw));
     }
 
     public ItemStack getFormattedItem(OfflinePlayer player, String[] replacements, String guiType){
@@ -175,19 +168,17 @@ public class CustomItem {
         ItemMeta meta = itemStack.getItemMeta();
         if (meta == null) return itemStack;
 
-        // Apply name using Adventure component (supports MiniMessage + legacy)
         if (name != null) {
             String parsedName = parseReplacements(name, player, replacements, guiType);
-            meta.displayName(toComponent(parsedName));
+            meta.setDisplayName(toDisplayString(parsedName));
         }
 
-        // Apply lore using Adventure components
         if (!lore.isEmpty()) {
             String[] finalReplacements = replacements;
-            List<Component> loreComponents = lore.stream()
-                    .map(s -> toComponent(parseReplacements(s, player, finalReplacements, guiType)))
+            List<String> newLore = lore.stream()
+                    .map(s -> toDisplayString(parseReplacements(s, player, finalReplacements, guiType)))
                     .toList();
-            meta.lore(loreComponents);
+            meta.setLore(newLore);
         }
 
         if (customModelData != -1)

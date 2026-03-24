@@ -1,13 +1,12 @@
 package me.jadenp.notbounties.features.settings.integrations.external_api;
 
-import com.nexomc.nexo.api.NexoItems;
-import com.nexomc.nexo.items.ItemBuilder;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Wrapper for the Nexo plugin API.
- * Nexo items can be used as GUI materials via "nexo:<item_id>" in the material field.
+ *
+ * In gui.yml you can use "material: nexo:<item_id>" for any custom-item slot.
  */
 public class NexoClass {
 
@@ -15,14 +14,16 @@ public class NexoClass {
      * Attempt to build an ItemStack from a Nexo item ID.
      *
      * @param itemId The Nexo item ID (the part after "nexo:")
-     * @return The built ItemStack, or null if the item doesn't exist
+     * @return The built ItemStack, or null if the item doesn't exist or Nexo is unavailable
      */
     @Nullable
     public ItemStack getItem(String itemId) {
         try {
-            ItemBuilder builder = NexoItems.itemFromId(itemId);
+            // Equivalent to: NexoItems.itemFromId(itemId).build()
+            Class<?> nexoItems = Class.forName("com.nexomc.nexo.api.NexoItems");
+            Object builder = nexoItems.getMethod("itemFromId", String.class).invoke(null, itemId);
             if (builder == null) return null;
-            return builder.build();
+            return (ItemStack) builder.getClass().getMethod("build").invoke(builder);
         } catch (Exception e) {
             return null;
         }
@@ -37,7 +38,9 @@ public class NexoClass {
      */
     public boolean isNexoItem(ItemStack itemStack, String itemId) {
         try {
-            String id = NexoItems.idFromItem(itemStack);
+            // Equivalent to: itemId.equals(NexoItems.idFromItem(itemStack))
+            Class<?> nexoItems = Class.forName("com.nexomc.nexo.api.NexoItems");
+            Object id = nexoItems.getMethod("idFromItem", ItemStack.class).invoke(null, itemStack);
             return itemId.equals(id);
         } catch (Exception e) {
             return false;
@@ -52,7 +55,9 @@ public class NexoClass {
      */
     public boolean isNexoItem(ItemStack itemStack) {
         try {
-            return NexoItems.idFromItem(itemStack) != null;
+            Class<?> nexoItems = Class.forName("com.nexomc.nexo.api.NexoItems");
+            Object id = nexoItems.getMethod("idFromItem", ItemStack.class).invoke(null, itemStack);
+            return id != null;
         } catch (Exception e) {
             return false;
         }
