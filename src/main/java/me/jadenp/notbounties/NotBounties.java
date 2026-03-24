@@ -32,6 +32,7 @@ import me.jadenp.notbounties.features.settings.integrations.external_api.*;
 import me.jadenp.notbounties.features.settings.integrations.external_api.bedrock.FloodGateClass;
 import me.jadenp.notbounties.features.settings.integrations.external_api.bedrock.GeyserMCClass;
 import me.jadenp.notbounties.features.settings.integrations.external_api.worldguard.WorldGuardClass;
+import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -94,6 +95,7 @@ public final class NotBounties extends JavaPlugin {
     private static Events events;
     private boolean started = false;
     private static ServerImplementation serverImplementation;
+    private static BukkitAudiences adventure;
 
     public static NamespacedKey getNamespacedKey() {
         return namespacedKey;
@@ -111,6 +113,16 @@ public final class NotBounties extends JavaPlugin {
         NotBounties.events = events;
     }
 
+    /**
+     * Returns the Adventure BukkitAudiences instance.
+     * Always non-null while the plugin is enabled.
+     */
+    public static BukkitAudiences adventure() {
+        if (adventure == null)
+            throw new IllegalStateException("NotBounties Adventure audiences accessed before onEnable!");
+        return adventure;
+    }
+
     @Override
     public void onLoad() {
         setInstance(this);
@@ -120,6 +132,9 @@ public final class NotBounties extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        // Initialise Adventure before anything else uses it
+        adventure = BukkitAudiences.create(this);
+
         if (new File(getDataFolder(), "debug.bin").exists()) {
             debug = true;
             getLogger().info("Debug mode enabled by debug.bin file.");
@@ -446,8 +461,11 @@ public final class NotBounties extends JavaPlugin {
         BountyBoard.clearBoard();
         DataManager.shutdown();
 
-
-
+        // Close Adventure last so nothing tries to send after it's gone
+        if (adventure != null) {
+            adventure.close();
+            adventure = null;
+        }
     }
 
 

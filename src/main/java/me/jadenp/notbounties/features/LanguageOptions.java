@@ -20,6 +20,8 @@ import me.jadenp.notbounties.data.Whitelist;
 import me.jadenp.notbounties.features.challenges.ChallengeManager;
 import me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime;
 import me.jadenp.notbounties.features.settings.integrations.external_api.PlaceholderAPIClass;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -46,6 +48,186 @@ public class LanguageOptions {
 
     private static final Map<String, String> messages = new HashMap<>();
     private static final Map<String, List<String>> listMessages = new HashMap<>();
+
+    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+
+    /**
+     * Maps legacy &x / §x color codes to their MiniMessage tag equivalents.
+     * Covers colors, basic formatting and reset.
+     */
+    private static final Map<Character, String> LEGACY_TO_MINI = new LinkedHashMap<>();
+
+    static {
+        LEGACY_TO_MINI.put('0', "<black>");
+        LEGACY_TO_MINI.put('1', "<dark_blue>");
+        LEGACY_TO_MINI.put('2', "<dark_green>");
+        LEGACY_TO_MINI.put('3', "<dark_aqua>");
+        LEGACY_TO_MINI.put('4', "<dark_red>");
+        LEGACY_TO_MINI.put('5', "<dark_purple>");
+        LEGACY_TO_MINI.put('6', "<gold>");
+        LEGACY_TO_MINI.put('7', "<gray>");
+        LEGACY_TO_MINI.put('8', "<dark_gray>");
+        LEGACY_TO_MINI.put('9', "<blue>");
+        LEGACY_TO_MINI.put('a', "<green>");
+        LEGACY_TO_MINI.put('b', "<aqua>");
+        LEGACY_TO_MINI.put('c', "<red>");
+        LEGACY_TO_MINI.put('d', "<light_purple>");
+        LEGACY_TO_MINI.put('e', "<yellow>");
+        LEGACY_TO_MINI.put('f', "<white>");
+        LEGACY_TO_MINI.put('l', "<bold>");
+        LEGACY_TO_MINI.put('m', "<strikethrough>");
+        LEGACY_TO_MINI.put('n', "<underlined>");
+        LEGACY_TO_MINI.put('o', "<italic>");
+        LEGACY_TO_MINI.put('k', "<obfuscated>");
+        LEGACY_TO_MINI.put('r', "<reset>");
+    }
+
+    public static Component toComponent(String str) {
+        if (str == null) return Component.empty();
+
+        str = str.replaceAll("&#([A-Fa-f0-9]{6})", "<#$1>");
+
+        str = str.replaceAll("</#[A-Fa-f0-9]{6}>", "<reset>");
+
+        StringBuilder sb = new StringBuilder(str.length() + 32);
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if ((c == '&' || c == '§') && i + 1 < str.length()) {
+                char code = Character.toLowerCase(str.charAt(i + 1));
+                String tag = LEGACY_TO_MINI.get(code);
+                if (tag != null) {
+                    sb.append(tag);
+                    i++;
+                    continue;
+                }
+            }
+            sb.append(c);
+        }
+
+        return MINI_MESSAGE.deserialize(sb.toString());
+    }
+
+    /**
+     * @param sender The recipient.
+     * @param raw The raw (un-colored) string from parseRaw / getMessage.
+     * @param receiver The player context used for placeholder substitution.
+     */
+    public static void sendMessage(CommandSender sender, String raw, OfflinePlayer receiver) {
+        Component component = toComponent(parseRaw(raw, receiver));
+        NotBounties.adventure().sender(sender).sendMessage(component);
+    }
+
+    public static void sendMessage(Player player, String raw) {
+        sendMessage(player, raw, player);
+    }
+
+    public static void sendMessage(CommandSender sender, Component component) {
+        NotBounties.adventure().sender(sender).sendMessage(component);
+    }
+
+
+    public static String parseRaw(String str, OfflinePlayer receiver) {
+        if (receiver != null) {
+            str = str.replace("{sort_type_name}", GUI.getActiveSortTypeName(receiver.getUniqueId()))
+                .replace("{sort_type}", GUI.getActiveSortType(receiver.getUniqueId()) + "");
+        }
+        if (str.contains("{time}")) {
+            String timeString = formatTime(System.currentTimeMillis(), LocalTime.TimeFormat.PLAYER, receiver == null ? null : receiver.getPlayer());
+            str = str.replace("{time}", timeString);
+        }
+        str = str.replace("{next_challenges}", formatTime(ChallengeManager.getNextChallengeChange() - System.currentTimeMillis(), LocalTime.TimeFormat.RELATIVE))
+            .replace("{min_bounty}", (NumberFormatting.getValue(ConfigOptions.getMoney().getMinBounty())))
+            .replace("{c_prefix}", (NumberFormatting.getCurrencyPrefix()))
+            .replace("{c_suffix}", (NumberFormatting.getCurrencySuffix()))
+            .replace("{whitelist_cost}", NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(Whitelist.getCost()) + NumberFormatting.getCurrencySuffix())
+            .replace("{tax}", (NumberFormatting.formatNumber(ConfigOptions.getMoney().getBountyTax() * 100)))
+            .replace("{buy_back_interest}", (NumberFormatting.formatNumber(ConfigOptions.getMoney().getBuyOwnCostMultiply() * 100)))
+            .replace("{permanent_cost}", (NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(ImmunityManager.getPermanentCost()) + NumberFormatting.getCurrencySuffix()))
+            .replace("{scaling_ratio}", (NumberFormatting.formatNumber(ImmunityManager.getScalingRatio())))
+            .replace("{time_immunity}", (formatTime((long) (ImmunityManager.getTime() * 1000L), LocalTime.TimeFormat.RELATIVE)));
+
+        if (receiver != null) {
+            Bounty bounty = BountyManager.getBounty(receiver.getUniqueId());
+            if (bounty != null) {
+                str = str.replace("{min_expire}", (formatTime(BountyExpire.getLowestExpireTime(bounty), LocalTime.TimeFormat.RELATIVE)))
+                    .replace("{max_expire}", (formatTime(BountyExpire.getHighestExpireTime(bounty), LocalTime.TimeFormat.RELATIVE)))
+                    .replace("{bounty}", NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(bounty.getTotalDisplayBounty()) + NumberFormatting.getCurrencySuffix())
+                    .replace("{bounty_value}", NumberFormatting.getValue(bounty.getTotalDisplayBounty()));
+            } else {
+                str = str.replace("{min_expire}", "");
+                str = str.replace("{max_expire}", "");
+            }
+            if (receiver.getName() != null) {
+                str = str.replace("{player}", getMessage("player-prefix") + receiver.getName() + getMessage("player-suffix"))
+                    .replace("{receiver}", getMessage("player-prefix") + receiver.getName() + getMessage("player-suffix"))
+                    .replace("{viewer}", getMessage("player-prefix") + receiver.getName() + getMessage("player-suffix"));
+            } else {
+                str = str.replace("{player}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-prefix"))
+                    .replace("{receiver}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-suffix"))
+                    .replace("{viewer}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-suffix"));
+            }
+            if (str.contains("{balance}"))
+                str = str.replace("{balance}", (NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(NumberFormatting.getBalance(receiver)) + NumberFormatting.getCurrencySuffix()));
+            PlayerData playerData = DataManager.getPlayerData(receiver.getUniqueId());
+            Whitelist whitelist = playerData.getWhitelist();
+            str = str.replace("{whitelist}", (whitelist.toString()));
+            String mode = whitelist.isBlacklist() ? "Blacklist" : "Whitelist";
+            str = str.replace("{mode}", mode);
+            mode = whitelist.isBlacklist() ? "false" : "true";
+            str = str.replace("{mode_raw}", mode);
+            String notification = playerData.getBroadcastSettings().toString();
+            str = str.replace("{notification}", notification)
+                    .replace("{immunity}", NumberFormatting.formatNumber(ImmunityManager.getImmunity(receiver.getUniqueId())));
+
+            while (str.contains("{sort_type_") && str.substring(str.indexOf("{sort_type_")).contains("}")) {
+                String stringValue = str.substring(str.indexOf("{sort_type_") + 11, str.indexOf("{sort_type_") + str.substring(str.indexOf("{sort_type_")).indexOf("}"));
+                str = str.replace("{sort_type_" + stringValue + "}", GUI.parseSortType(stringValue, DataManager.getPlayerData(receiver.getUniqueId()).getGUISortType(stringValue)));
+            }
+
+            while (str.contains("{whitelist") && str.substring(str.indexOf("{whitelist")).contains("}")) {
+                int num;
+                String stringValue = str.substring(str.indexOf("{whitelist") + 10, str.indexOf("{whitelist") + str.substring(str.indexOf("{whitelist")).indexOf("}"));
+                try {
+                    num = Integer.parseInt(stringValue);
+                } catch (NumberFormatException e) {
+                    str = str.replace("{whitelist" + stringValue + "}", "<Error>");
+                    continue;
+                }
+                if (num < 1)
+                    num = 1;
+                if (whitelist.getList().size() > num)
+                    str = str.replace("{whitelist" + stringValue + "}", "");
+                else
+                    str = str.replace("{whitelist" + stringValue + "}", LoggedPlayers.getPlayerName(whitelist.getList().last()));
+            }
+            if (receiver.isOnline() && GUI.playerInfo.containsKey(receiver.getUniqueId())) {
+                PlayerGUInfo info = GUI.playerInfo.get(receiver.getUniqueId());
+                str = str.replace("{page}", info.page() + "")
+                        .replace("{page_max}", info.maxPage() + "")
+                        .replace("{gui}", info.guiType());
+
+                while (str.contains("{player") && str.substring(str.indexOf("{player")).contains("}")) {
+                    String replacement = "";
+                    String slotString = str.substring(str.indexOf("{player") + 7, str.substring(str.indexOf("{player")).indexOf("}") + str.substring(0, str.indexOf("{player")).length());
+                    try {
+                        int slot = Integer.parseInt(slotString);
+                        if (info.displayItems().size() > slot - 1 && info.displayItems().get(slot - 1) instanceof PlayerItem playerItem) {
+                            replacement = LoggedPlayers.getPlayerName(playerItem.getUuid());
+                        }
+                    } catch (NumberFormatException e) {
+                        Bukkit.getLogger().warning("Error getting player in command: \n" + str);
+                    }
+                    str = str.replace(("{player" + slotString + "}"), (replacement));
+                }
+            }
+            // papi parse
+            if (ConfigOptions.getIntegrations().isPapiEnabled()) {
+                str = new PlaceholderAPIClass().parse(receiver, str);
+            }
+        }
+
+        return str;
+    }
 
     public static File getLanguageFile() {
         return new File(NotBounties.getInstance().getDataFolder() + File.separator + "language.yml");
@@ -556,13 +738,12 @@ public class LanguageOptions {
         str = net.md_5.bungee.api.ChatColor.translateAlternateColorCodes('&', str);
         return cancelColorCodes("</#", ">", translateHexColorCodes("<#", ">", translateHexColorCodes("&#","", str)));
     }
-    public static String translateHexColorCodes(String startTag, String endTag, String message)
-    {
+
+    public static String translateHexColorCodes(String startTag, String endTag, String message) {
         final Pattern hexPattern = Pattern.compile(startTag + "([A-Fa-f0-9]{6})" + endTag);
         Matcher matcher = hexPattern.matcher(message);
         StringBuilder buffer = new StringBuilder(message.length() + 4 * 8);
-        while (matcher.find())
-        {
+        while (matcher.find()) {
             String group = matcher.group(1);
             matcher.appendReplacement(buffer, COLOR_CHAR + "x"
                     + COLOR_CHAR + group.charAt(0) + COLOR_CHAR + group.charAt(1)
@@ -572,19 +753,16 @@ public class LanguageOptions {
         }
         return matcher.appendTail(buffer).toString();
     }
-    public static String cancelColorCodes(String startTag, String endTag, String message)
-    {
+
+    public static String cancelColorCodes(String startTag, String endTag, String message) {
         final Pattern hexPattern = Pattern.compile(startTag + "([A-Fa-f0-9]{6})" + endTag);
         Matcher matcher = hexPattern.matcher(message);
         StringBuilder buffer = new StringBuilder(message.length() + 4 * 8);
-        while (matcher.find())
-        {
-            matcher.appendReplacement(buffer, org.bukkit.ChatColor.RESET + ""
-            );
+        while (matcher.find()) {
+            matcher.appendReplacement(buffer, org.bukkit.ChatColor.RESET + "");
         }
         return matcher.appendTail(buffer).toString();
     }
-
 
     public static String getPrefix() {
         return prefix;
