@@ -425,6 +425,17 @@ public final class NotBounties extends JavaPlugin {
     @Override
     public void onDisable() {
         // Plugin shutdown logic
+        if (!started) {
+            // Plugin failed to start; avoid touching optional integrations that may not be loadable.
+            BountyBoard.clearBoard();
+            DataManager.shutdown();
+            if (adventure != null) {
+                adventure.close();
+                adventure = null;
+            }
+            return;
+        }
+
         if (ConfigOptions.getIntegrations().isMmoLibEnabled())
             MMOLibClass.removeAllModifiers();
         SkinManager.shutdown();
@@ -434,13 +445,6 @@ public final class NotBounties extends JavaPlugin {
         // remove bounty entities
         WantedTags.disableWantedTags();
 
-        if (!started) {
-            // Plugin failed to start.
-            // Returning, so save data isn't overwritten.
-            BountyBoard.clearBoard();
-            DataManager.shutdown();
-            return;
-        }
 
         // close all GUIs
         for (Player player : Bukkit.getOnlinePlayers()) {

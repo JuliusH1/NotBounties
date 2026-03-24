@@ -41,7 +41,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <minimizeJar>true</minimizeJar>
+                    <minimizeJar>false</minimizeJar>
                     <createDependencyReducedPom>true</createDependencyReducedPom>
                     <filters>
                         <filter>
@@ -73,31 +73,12 @@
                             <pattern>com.cjcrafter.foliascheduler</pattern>
                             <shadedPattern>me.jadenp.notbounties.internal.foliascheduler</shadedPattern>
                         </relocation>
+                        <relocation>
+                            <pattern>net.kyori</pattern>
+                            <shadedPattern>me.jadenp.notbounties.libs.kyori</shadedPattern>
+                        </relocation>
                     </relocations>
                 </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.3</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals><goal>shade</goal></goals>
-                        <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <relocations>
-                                <relocation>
-                                    <pattern>net.kyori</pattern>
-                                    <shadedPattern>me.jadenp.notbounties.libs.kyori</shadedPattern>
-                                </relocation>
-                            </relocations>
-                            <artifactSet>
-                                <includes><include>net.kyori:*</include></includes>
-                            </artifactSet>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
         <resources>
