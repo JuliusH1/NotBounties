@@ -86,7 +86,6 @@ public class LanguageOptions {
         if (str == null) return Component.empty();
 
         str = str.replaceAll("&#([A-Fa-f0-9]{6})", "<#$1>");
-
         str = str.replaceAll("</#[A-Fa-f0-9]{6}>", "<reset>");
 
         StringBuilder sb = new StringBuilder(str.length() + 32);
@@ -735,6 +734,7 @@ public class LanguageOptions {
     }
 
     public static String color(String str){
+        str = MINI_MESSAGE.stripTags(str);
         str = net.md_5.bungee.api.ChatColor.translateAlternateColorCodes('&', str);
         return cancelColorCodes("</#", ">", translateHexColorCodes("<#", ">", translateHexColorCodes("&#","", str)));
     }
