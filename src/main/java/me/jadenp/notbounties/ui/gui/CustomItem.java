@@ -3,9 +3,12 @@ package me.jadenp.notbounties.ui.gui;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import me.jadenp.notbounties.NotBounties;
+import me.jadenp.notbounties.features.ConfigOptions;
 import me.jadenp.notbounties.features.LanguageOptions;
 import me.jadenp.notbounties.ui.Head;
 import me.jadenp.notbounties.utils.DataManager;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
@@ -26,6 +29,8 @@ import static me.jadenp.notbounties.features.LanguageOptions.parse;
 
 public class CustomItem {
     private final Material material;
+    // If non-null, the material field is ignored and this Nexo item ID is used instead
+    private final String nexoItemId;
     private final int amount;
     private final int customModelData;
     private final String itemModel;
@@ -40,21 +45,31 @@ public class CustomItem {
 
     public CustomItem(ConfigurationSection configurationSection){
         Material material = Material.STONE;
+        String nexoId = null;
         String mat = configurationSection.getString("material");
         if (mat != null) {
-            if (mat.contains(" ") && mat.substring(0, mat.indexOf(" ")).equalsIgnoreCase("PLAYER_HEAD")) {
+            if (mat.toLowerCase(Locale.ROOT).startsWith("nexo:")) {
+                // Nexo item — store the ID and keep material as STONE as a fallback
+                nexoId = mat.substring(5);
+            } else if (mat.contains(" ") && mat.substring(0, mat.indexOf(" ")).equalsIgnoreCase("PLAYER_HEAD")) {
                 // has head data
                 headID = mat.substring(mat.indexOf(" ") + 1);
                 mat = mat.substring(0, mat.indexOf(" "));
-
-            }
                 try {
                     material = Material.valueOf(mat.toUpperCase(Locale.ROOT));
                 } catch (IllegalArgumentException e) {
                     Bukkit.getLogger().warning("Unknown material \"" + mat + "\" in " + configurationSection.getName());
                 }
+            } else {
+                try {
+                    material = Material.valueOf(mat.toUpperCase(Locale.ROOT));
+                } catch (IllegalArgumentException e) {
+                    Bukkit.getLogger().warning("Unknown material \"" + mat + "\" in " + configurationSection.getName());
+                }
+            }
         }
         this.material = material;
+        this.nexoItemId = nexoId;
         amount = configurationSection.isInt("amount") ? configurationSection.getInt("amount") : 1;
 
         name = configurationSection.getString("name");
@@ -75,6 +90,7 @@ public class CustomItem {
 
     public CustomItem() {
         material = Material.STONE;
+        nexoItemId = null;
         amount = 1;
         customModelData = -1;
         itemModel = null;
@@ -90,6 +106,7 @@ public class CustomItem {
     public CustomItem(Material material, int amount, int customModelData, String itemModel, String name, List<String> lore, boolean enchanted, boolean hideNBT, boolean hideTooltip, List<String> commands, Color color) {
 
         this.material = material;
+        this.nexoItemId = null;
         this.amount = amount;
         this.customModelData = customModelData;
         this.itemModel = itemModel;
@@ -117,6 +134,13 @@ public class CustomItem {
                 .replace("{gui}", guiType), player);
     }
 
+    /**
+     * Convert a parsed (color-coded) string to an Adventure Component.
+     * Supports both legacy (&x) codes and MiniMessage tags.
+     */
+    public static Component toComponent(String parsed) {
+        return LanguageOptions.toComponent(parsed);
+    }
 
     public ItemStack getFormattedItem(OfflinePlayer player, String[] replacements, String guiType){
         if (replacements == null)
@@ -126,19 +150,46 @@ public class CustomItem {
             System.arraycopy(replacements, 0, newReplacements, 0, replacements.length);
             replacements = newReplacements;
         }
-        ItemStack itemStack = headID != null && material == Material.PLAYER_HEAD ? Head.createPlayerSkull(LanguageOptions.parse(headID, player)) : new ItemStack(material, amount);
+
+        ItemStack itemStack;
+
+        if (nexoItemId != null && ConfigOptions.getIntegrations().isNexoEnabled()) {
+            ItemStack nexoItem = ConfigOptions.getIntegrations().getNexo().getItem(nexoItemId);
+            if (nexoItem != null) {
+                itemStack = nexoItem.clone();
+                itemStack.setAmount(amount);
+            } else {
+                Bukkit.getLogger().warning("[NotBounties] Nexo item \"" + nexoItemId + "\" not found. Using barrier as fallback.");
+                itemStack = new ItemStack(Material.BARRIER, amount);
+            }
+        } else if (headID != null && material == Material.PLAYER_HEAD) {
+            ItemStack head = Head.createPlayerSkull(LanguageOptions.parse(headID, player));
+            itemStack = head != null ? head : new ItemStack(material, amount);
+        } else {
+            itemStack = new ItemStack(material, amount);
+        }
+
         if (itemStack == null)
             return null;
+
         ItemMeta meta = itemStack.getItemMeta();
         if (meta == null) return itemStack;
-        if (name != null)
-            meta.setDisplayName(parseReplacements(name, player, replacements, guiType));
-        if (!lore.isEmpty()) {
-            List<String> newLore = new ArrayList<>(this.lore);
-            String[] finalReplacements = replacements;
-            newLore.replaceAll(s -> parseReplacements(s, player, finalReplacements, guiType));
-            meta.setLore(newLore);
+
+        // Apply name using Adventure component (supports MiniMessage + legacy)
+        if (name != null) {
+            String parsedName = parseReplacements(name, player, replacements, guiType);
+            meta.displayName(toComponent(parsedName));
         }
+
+        // Apply lore using Adventure components
+        if (!lore.isEmpty()) {
+            String[] finalReplacements = replacements;
+            List<Component> loreComponents = lore.stream()
+                    .map(s -> toComponent(parseReplacements(s, player, finalReplacements, guiType)))
+                    .toList();
+            meta.lore(loreComponents);
+        }
+
         if (customModelData != -1)
             meta.setCustomModelData(customModelData);
         if (NotBounties.isAboveVersion(21, 3) && itemModel != null)
@@ -251,13 +302,7 @@ public class CustomItem {
         return null;
     }
 
-    /**
-     * Get a Bukkit color from the name
-     * @param input String input
-     * @return A bukkit color representing the input, or null if the input doesn't match a color.
-     */
     private static Color getColorFromName(String input) {
-        // Check for named colors
         return switch (input) {
             case "red" -> Color.RED;
             case "green" -> Color.GREEN;

@@ -24,6 +24,8 @@ public class Integrations extends ResourceConfiguration {
     private boolean worldGuardEnabled;
     private boolean packetEventsEnabled;
     private boolean luckPermsEnabled;
+    private boolean nexoEnabled;
+    private NexoClass nexoClass;
 
     public static void onLoad(Plugin plugin) {
         // register api flags
@@ -68,6 +70,13 @@ public class Integrations extends ResourceConfiguration {
         }
         packetEventsEnabled = Bukkit.getPluginManager().isPluginEnabled("packetevents");
         luckPermsEnabled = Bukkit.getPluginManager().isPluginEnabled("LuckPerms");
+
+        // Nexo integration
+        nexoEnabled = Bukkit.getPluginManager().isPluginEnabled("Nexo");
+        if (nexoEnabled) {
+            nexoClass = new NexoClass();
+            Bukkit.getLogger().info("[NotBounties] Connected to Nexo");
+        }
     }
 
     @Override
@@ -134,5 +143,13 @@ public class Integrations extends ResourceConfiguration {
 
     public boolean isLuckPermsEnabled() {
         return luckPermsEnabled;
+    }
+
+    public boolean isNexoEnabled() {
+        return nexoEnabled;
+    }
+
+    public NexoClass getNexo() {
+        return nexoClass;
     }
 }

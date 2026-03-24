@@ -1,6 +1,7 @@
 package me.jadenp.notbounties.ui.gui;
 
 import me.jadenp.notbounties.Leaderboard;
+import me.jadenp.notbounties.NotBounties;
 import me.jadenp.notbounties.data.Whitelist;
 import me.jadenp.notbounties.ui.HeadFetcher;
 import me.jadenp.notbounties.ui.QueuedHead;
@@ -9,7 +10,9 @@ import me.jadenp.notbounties.ui.gui.display_items.PlayerItem;
 import me.jadenp.notbounties.utils.DataManager;
 import me.jadenp.notbounties.features.challenges.ChallengeManager;
 import me.jadenp.notbounties.features.ConfigOptions;
+import me.jadenp.notbounties.features.LanguageOptions;
 import me.jadenp.notbounties.features.settings.money.NumberFormatting;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
@@ -22,7 +25,7 @@ import java.util.*;
 import static me.jadenp.notbounties.features.LanguageOptions.*;
 
 public class GUIOptions {
-    private final List<Integer> playerSlots; // this size of this is how many player slots per page
+    private final List<Integer> playerSlots;
     private final int size;
     private final int sortType;
     private final CustomItem[] customItems;
@@ -40,7 +43,7 @@ public class GUIOptions {
     public GUIOptions(ConfigurationSection settings) {
         InventoryType inventoryType1;
         type = settings.getName();
-        name = settings.isSet("gui-name") ? color(settings.getString("gui-name")) : "Custom GUI";
+        name = settings.isSet("gui-name") ? settings.getString("gui-name") : "Custom GUI";
         playerSlots = new ArrayList<>();
         if (settings.isString("inventory-type")) {
             try {
@@ -140,17 +143,35 @@ public class GUIOptions {
     }
 
     /**
-     * Get the formatted custom inventory
+     * Build the title Component for the inventory.
+     * Supports MiniMessage tags as well as legacy &x color codes.
+     */
+    private Component buildTitleComponent(String rawTitle) {
+        return LanguageOptions.toComponent(rawTitle);
+    }
+
+    /**
+     * Get the formatted custom inventory.
      *
-     * @param player Player that owns the inventory and will be parsed for any placeholders
-     * @param page   Page of gui - This will change the items in player slots and page items if enabled
-     * @return Custom GUI Inventory
+     * @param player Player that owns the inventory
+     * @param page Current page
+     * @param maxPage Maximum page
+     * @param displayItems Items to display
+     * @param title Pre-built title string (may contain MiniMessage tags or legacy codes)
+     * @param data Additional data
+     * @return Filled Inventory
      */
     public Inventory createInventory(Player player, long page, long maxPage, List<DisplayItem> displayItems, String title, Object[] data) {
         if (page < 1) {
             page = 1;
         }
-        Inventory inventory = inventoryType == InventoryType.CHEST ? Bukkit.createInventory(player, size, title) : Bukkit.createInventory(player, inventoryType, title);
+
+        // Use Adventure API so MiniMessage tags in the title are properly rendered
+        Component titleComponent = buildTitleComponent(title);
+        Inventory inventory = inventoryType == InventoryType.CHEST
+            ? Bukkit.createInventory(player, size, titleComponent)
+            : Bukkit.createInventory(player, inventoryType, titleComponent);
+
         ItemStack[] contents = inventory.getContents();
         String[] replacements;
         if (data.length == 0) {
@@ -167,23 +188,19 @@ public class GUIOptions {
             double tax = page * ConfigOptions.getMoney().getBountyTax() + DataManager.getPlayerData(player.getUniqueId()).getWhitelist().getList().size() * Whitelist.getCost();
             double total = page + tax;
             replacements = new String[]{"",
-                    NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(page) + NumberFormatting.getCurrencySuffix(), // amount
-                    NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(tax) + NumberFormatting.getCurrencySuffix(), // tax
-                    NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(total) + NumberFormatting.getCurrencySuffix(), // amount_tax
+                    NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(page) + NumberFormatting.getCurrencySuffix(),
+                    NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(tax) + NumberFormatting.getCurrencySuffix(),
+                    NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(total) + NumberFormatting.getCurrencySuffix(),
                     page + "", maxPage + ""
             };
         } else if (type.equals("confirm") && data[0] instanceof Number number) {
             String amount = NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(number.doubleValue()) + NumberFormatting.getCurrencySuffix();
-            replacements = new String[]{"",
-                    amount, // amount
-                    amount, // tax
-                    amount, // amount_tax
-                    page + "", maxPage + ""
-            };
+            replacements = new String[]{"", amount, amount, amount, page + "", maxPage + ""};
         } else {
             replacements = new String[]{"", "", "", "", page + "", maxPage + ""};
         }
-        // set up regular items
+
+        // Populate regular (non-player) slots
         for (int i = 0; i < contents.length; i++) {
             if (customItems[i] == null)
                 continue;
@@ -204,7 +221,8 @@ public class GUIOptions {
             }
             contents[i] = customItems[i].getFormattedItem(player, replacements, type);
         }
-        // set up player slots
+
+        // Populate player slots
         List<QueuedHead> unloadedHeads = new ArrayList<>();
         boolean isSinglePlayerSlot = type.equals("select-price") || type.equals("confirm-bounty") || type.equals("bounty-item-select") || type.equals("challenges") || type.equals("bounty-hunt-time");
         for (int i = isSinglePlayerSlot ? 0 : (int) ((page - 1) * playerSlots.size()); i < Math.min(playerSlots.size() * page, displayItems.size()); i++) {
@@ -216,6 +234,7 @@ public class GUIOptions {
                 unloadedHeads.add(new QueuedHead(playerItem.getUuid(), item, slot));
             contents[slot] = item;
         }
+
         if (type.equals("challenges")) {
             ItemStack[] items = ChallengeManager.getDisplayItems(player);
             for (int i = 0; i < Math.min(playerSlots.size(), items.length); i++) {
@@ -248,6 +267,9 @@ public class GUIOptions {
         return playerSlots;
     }
 
+    /**
+     * Get the raw (un-colored) GUI name string. Used for title parsing before building the Component.
+     */
     public String getName() {
         return name;
     }
@@ -267,7 +289,7 @@ public class GUIOptions {
             // return if an exception was not thrown
             return new int[]{i};
         } catch (NumberFormatException e) {
-            // there is a dash we need to get out
+            // fall through
         }
         String[] split = str.split("-");
         try {

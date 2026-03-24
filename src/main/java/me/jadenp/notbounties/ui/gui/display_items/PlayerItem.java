@@ -11,6 +11,7 @@ import me.jadenp.notbounties.features.LanguageOptions;
 import me.jadenp.notbounties.features.settings.money.NumberFormatting;
 import me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime;
 import me.jadenp.notbounties.utils.LoggedPlayers;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -21,10 +22,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Represents a player
+ * Represents a player head item in a GUI.
  */
-
-public class PlayerItem implements DisplayItem, AmountItem{
+public class PlayerItem implements DisplayItem, AmountItem {
     private final UUID uuid;
     private final double amount;
     private final Leaderboard displayType;
@@ -39,10 +39,17 @@ public class PlayerItem implements DisplayItem, AmountItem{
         SkullMeta meta = (SkullMeta) item.getItemMeta();
         if (meta == null)
             return item;
-        meta.setDisplayName(parseText(headName, player));
-        lore = new ArrayList<>(lore); // create a copy so the original lore isn't edited
+
+        String parsedName = parseText(headName, player);
+        meta.displayName(LanguageOptions.toComponent(parsedName));
+
+        lore = new ArrayList<>(lore);
         lore.addAll(additionalLore);
-        meta.setLore(lore.stream().map(string -> parseText(string, player)).toList());
+        List<Component> loreComponents = lore.stream()
+                .map(string -> LanguageOptions.toComponent(parseText(string, player)))
+                .toList();
+        meta.lore(loreComponents);
+
         if (customModelData != -1)
             meta.setCustomModelData(customModelData);
         if (NotBounties.isAboveVersion(21, 3) && itemModel != null)
