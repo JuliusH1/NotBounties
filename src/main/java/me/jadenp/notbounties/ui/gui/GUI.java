@@ -569,9 +569,11 @@ public class GUI implements Listener {
 
         // check if previously in a GUI
         if (playerInfo.containsKey(player.getUniqueId())) {
-            String title = CompatabilityUtils.getTitle(player);
+            // Use raw title stored in playerInfo for comparison, not the rendered window title
             PlayerGUInfo info = playerInfo.get(player.getUniqueId());
-            if (title.equals(info.title()) && !info.guiType().equals(name) && info.guiType().equals("bounty-item-select")) {
+            String currentWindowTitle = CompatabilityUtils.getTitle(player);
+            String storedLegacyTitle = LanguageOptions.componentToLegacyString(LanguageOptions.toComponent(info.title()));
+            if (currentWindowTitle.equals(storedLegacyTitle) && !info.guiType().equals(name) && info.guiType().equals("bounty-item-select")) {
                 NotBounties.debugMessage("Returning GUI items.", false);
                 // titles match
                 // return items they have place in the inventory
@@ -605,18 +607,24 @@ public class GUI implements Listener {
                 } else {
                     playerInfo.put(player.getUniqueId(), new PlayerGUInfo(finalPage, maxPage, "", new Object[0], Collections.emptyList(), ""));
                 }
-                String title = createTitle(gui, player, finalPage, maxPage, displayItems, data);
-                PlayerGUInfo info = new PlayerGUInfo(finalPage, maxPage, name, data, displayItems, title);
-                Inventory inventory = gui.createInventory(player, finalPage, maxPage, displayItems, title, data);
+                // createTitle now returns a raw string (with MiniMessage tags intact, no color() applied)
+                String rawTitle = createTitle(gui, player, finalPage, maxPage, displayItems, data);
+                PlayerGUInfo info = new PlayerGUInfo(finalPage, maxPage, name, data, displayItems, rawTitle);
+                Inventory inventory = gui.createInventory(player, finalPage, maxPage, displayItems, rawTitle, data);
+
                 NotBounties.getServerImplementation().global().run(() -> {
-                    boolean guiOpen = playerInfo.containsKey(player.getUniqueId()) && gui.getType().equals(playerInfo.get(player.getUniqueId()).guiType()) && CompatabilityUtils.getTitle(player).equals(playerInfo.get(player.getUniqueId()).title());
+                    // Compare rendered legacy titles for the "already open" window check
+                    String renderedTitle = LanguageOptions.componentToLegacyString(LanguageOptions.toComponent(rawTitle));
+                    boolean guiOpen = playerInfo.containsKey(player.getUniqueId())
+                            && gui.getType().equals(playerInfo.get(player.getUniqueId()).guiType())
+                            && CompatabilityUtils.getTitle(player).equals(renderedTitle);
                     playerInfo.put(player.getUniqueId(), info);
                     if (guiOpen) {
                         // already has the gui type open - update contents
                         Inventory topInventory = CompatabilityUtils.getTopInventory(player);
                         topInventory.setContents(inventory.getContents());
                         if (NotBounties.getServerVersion() >= 19)
-                            CompatabilityUtils.setTitle(player, title);
+                            CompatabilityUtils.setTitle(player, rawTitle);
                     } else {
                         player.openInventory(inventory);
                     }
@@ -665,7 +673,8 @@ public class GUI implements Listener {
                 .replace("%notbounties_total_pages%", (maxPage + ""));
         if (addPage)
             title = title + " " + page;
-        return LanguageOptions.parse(title, viewer);
+        // Use parseRaw instead of parse so MiniMessage tags (<white>, <font:...>, etc.) are NOT stripped by color()
+        return LanguageOptions.parseRaw(title, viewer);
     }
 
     public static int estimateMaxPage(String type, Player viewer, int numPlayerSlots, List<DisplayItem> displayItems, Object[] data) {
@@ -710,9 +719,12 @@ public class GUI implements Listener {
 
     @EventHandler
     public void onGUIClose(InventoryCloseEvent event) {
-        String title = CompatabilityUtils.getTitle(event);
-
-        if (playerInfo.containsKey(event.getPlayer().getUniqueId()) && playerInfo.get(event.getPlayer().getUniqueId()).title().equals(title)) {
+        if (!playerInfo.containsKey(event.getPlayer().getUniqueId())) return;
+        PlayerGUInfo info = playerInfo.get(event.getPlayer().getUniqueId());
+        // Compare the rendered legacy title of the stored raw title against the closed window title
+        String renderedTitle = LanguageOptions.componentToLegacyString(LanguageOptions.toComponent(info.title()));
+        String closedTitle = CompatabilityUtils.getTitle(event);
+        if (renderedTitle.equals(closedTitle)) {
             NotBounties.debugMessage("Returning GUI items.", false);
             // titles match
                 // return items they have place in the inventory

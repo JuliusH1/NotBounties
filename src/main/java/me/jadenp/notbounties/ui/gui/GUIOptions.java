@@ -3,7 +3,6 @@ package me.jadenp.notbounties.ui.gui;
 import me.jadenp.notbounties.Leaderboard;
 import me.jadenp.notbounties.data.Whitelist;
 import me.jadenp.notbounties.features.ConfigOptions;
-import me.jadenp.notbounties.features.LanguageOptions;
 import me.jadenp.notbounties.features.challenges.ChallengeManager;
 import me.jadenp.notbounties.features.settings.money.NumberFormatting;
 import me.jadenp.notbounties.ui.HeadFetcher;
@@ -138,10 +137,6 @@ public class GUIOptions {
         return item;
     }
 
-    private static String buildTitleString(String rawTitle) {
-        return LanguageOptions.componentToLegacyString(LanguageOptions.toComponent(rawTitle));
-    }
-
     /**
      * Get the formatted custom inventory.
      *
@@ -149,19 +144,14 @@ public class GUIOptions {
      * @param page Current page
      * @param maxPage Maximum page
      * @param displayItems Items to display
-     * @param title Pre-built title string (may contain MiniMessage tags or legacy codes)
+     * @param rawTitle Pre-built title string (may contain MiniMessage tags or legacy codes) — NOT yet color()-processed
      * @param data Additional data
      * @return Filled Inventory
      */
-    public Inventory createInventory(Player player, long page, long maxPage, List<DisplayItem> displayItems, String title, Object[] data) {
-        if (page < 1) {
-            page = 1;
-        }
+    public Inventory createInventory(Player player, long page, long maxPage, List<DisplayItem> displayItems, String rawTitle, Object[] data) {
+        if (page < 1) page = 1;
 
-        String legacyTitle = buildTitleString(title);
-        Inventory inventory = inventoryType == InventoryType.CHEST
-                ? Bukkit.createInventory(player, size, legacyTitle)
-                : Bukkit.createInventory(player, inventoryType, legacyTitle);
+        Inventory inventory = CompatabilityUtils.createInventory(player, inventoryType, size, rawTitle);
 
         ItemStack[] contents = inventory.getContents();
         String[] replacements;
@@ -232,7 +222,7 @@ public class GUIOptions {
                 contents[playerSlots.get(i)] = items[i];
             }
         } else {
-            new HeadFetcher().loadHeads(player, new PlayerGUInfo(page, maxPage, type, data, displayItems, title), unloadedHeads);
+            new HeadFetcher().loadHeads(player, new PlayerGUInfo(page, maxPage, type, data, displayItems, rawTitle), unloadedHeads);
         }
 
         if  (type.equals("bounty-item-select") && data.length > 1 && data[1] instanceof ItemStack[][] items && items.length >= page) {
