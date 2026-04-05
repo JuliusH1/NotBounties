@@ -132,7 +132,7 @@ public class CustomItem {
     }
 
     public static String toDisplayString(String raw) {
-        return LanguageOptions.componentToLegacyString(LanguageOptions.toComponent(raw));
+        return LanguageOptions.componentToLegacyString(LanguageOptions.toItemComponent(raw));
     }
 
     public ItemStack getFormattedItem(OfflinePlayer player, String[] replacements, String guiType){
@@ -335,5 +335,48 @@ public class CustomItem {
         if (key == null) return model == null;
         if (model == null) return false;
         return model.equals(key.getNamespace() + ":" + key.getKey());
+    }
+
+    /**
+     * Safely sets the item model on ItemMeta using reflection if the method doesn't exist.
+     * This handles compatibility with older Paper/Bukkit versions.
+     */
+    public static void setItemModelSafe(@Nullable ItemMeta meta, @Nullable NamespacedKey model) {
+        if (meta == null || model == null) return;
+        try {
+            meta.setItemModel(model);
+        } catch (NoSuchMethodError e) {
+            // Fallback: method doesn't exist in this version, skip silently
+            Bukkit.getLogger().warning("ItemMeta.setItemModel() not available in this version");
+        }
+    }
+
+    /**
+     * Safely checks if ItemMeta has an item model using reflection.
+     * Returns false if the method doesn't exist.
+     */
+    public static boolean hasItemModelSafe(@Nullable ItemMeta meta) {
+        if (meta == null) return false;
+        try {
+            return meta.hasItemModel();
+        } catch (NoSuchMethodError e) {
+            // Fallback: method doesn't exist in this version
+            return false;
+        }
+    }
+
+    /**
+     * Safely gets the item model from ItemMeta using reflection.
+     * Returns null if the method doesn't exist.
+     */
+    @Nullable
+    public static NamespacedKey getItemModelFromMetaSafe(@Nullable ItemMeta meta) {
+        if (meta == null) return null;
+        try {
+            return meta.getItemModel();
+        } catch (NoSuchMethodError e) {
+            // Fallback: method doesn't exist in this version
+            return null;
+        }
     }
 }

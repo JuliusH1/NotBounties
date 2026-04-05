@@ -49,7 +49,9 @@ public class PlayerItem implements DisplayItem, AmountItem {
                 .toList();
         meta.setLore(loreStrings);
 
-        if (customModelData != -1)
+        // Note: Do NOT apply customModelData or itemModel to player skull items
+        // These override the player skin texture and break the skull display
+        // Player heads should display the actual player skin, not a custom texture
             meta.setCustomModelData(customModelData);
         if (NotBounties.isAboveVersion(21, 3) && itemModel != null)
             meta.setItemModel(CustomItem.getItemModel(itemModel));

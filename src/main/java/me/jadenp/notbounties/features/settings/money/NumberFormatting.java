@@ -363,8 +363,9 @@ public class NumberFormatting {
                 Material material = item.getType();
                 String customModelData = "-1";
                 if (item.getItemMeta() != null) {
-                    if (item.getItemMeta().hasItemModel()) {
-                        customModelData = CustomItem.getItemModel(item.getItemMeta().getItemModel());
+                    if (CustomItem.hasItemModelSafe(item.getItemMeta())) {
+                        NamespacedKey itemModel = CustomItem.getItemModelFromMetaSafe(item.getItemMeta());
+                        customModelData = CustomItem.getItemModel(itemModel);
                     } else if (item.getItemMeta().hasCustomModelData()) {
                         customModelData = item.getItemMeta().getCustomModelData() + "";
                     }
@@ -951,7 +952,7 @@ public class NumberFormatting {
             ItemMeta meta = item.getItemMeta();
             if (meta != null) {
                 if (NotBounties.isAboveVersion(21, 3) && customModelDatas.get(i).contains(":")) {
-                    meta.setItemModel(CustomItem.getItemModel(customModelDatas.get(i)));
+                    CustomItem.setItemModelSafe(meta, CustomItem.getItemModel(customModelDatas.get(i)));
                 } else {
                     meta.setCustomModelData(Integer.parseInt(customModelDatas.get(i)));
                 }
@@ -971,7 +972,7 @@ public class NumberFormatting {
                 ItemMeta meta = item.getItemMeta();
                 if (meta != null) {
                     if (NotBounties.isAboveVersion(21, 3) && customModelDatas.get(0).contains(":")) {
-                        meta.setItemModel(CustomItem.getItemModel(customModelDatas.get(0)));
+                        CustomItem.setItemModelSafe(meta, CustomItem.getItemModel(customModelDatas.get(0)));
                     } else {
                         meta.setCustomModelData(Integer.parseInt(customModelDatas.get(0)));
                     }
@@ -1324,7 +1325,7 @@ public class NumberFormatting {
 
     public static boolean isCorrectMaterial(ItemStack item, Material material, String customModelData) {
         return item.getType().equals(material) &&
-                (customModelData.equals("-1") || (item.hasItemMeta() && (Objects.requireNonNull(item.getItemMeta()).hasCustomModelData() && customModelData.equals(item.getItemMeta().getCustomModelData() + "")) || (item.getItemMeta().hasItemModel() && CustomItem.isItemModelEqual(item.getItemMeta().getItemModel(), customModelData))));
+                (customModelData.equals("-1") || (item.hasItemMeta() && (Objects.requireNonNull(item.getItemMeta()).hasCustomModelData() && customModelData.equals(item.getItemMeta().getCustomModelData() + "")) || (CustomItem.hasItemModelSafe(item.getItemMeta()) && CustomItem.isItemModelEqual(CustomItem.getItemModelFromMetaSafe(item.getItemMeta()), customModelData))));
     }
 
     public static Map<Long, String> sortByValue(Map<Long, String> hm) {

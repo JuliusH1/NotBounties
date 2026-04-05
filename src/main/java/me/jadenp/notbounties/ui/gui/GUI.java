@@ -609,6 +609,10 @@ public class GUI implements Listener {
                 }
                 // createTitle now returns a raw string (with MiniMessage tags intact, no color() applied)
                 String rawTitle = createTitle(gui, player, finalPage, maxPage, displayItems, data);
+                // DEBUG: Log font tags for troubleshooting
+                if (rawTitle.contains("<font")) {
+                    Bukkit.getLogger().info("[NotBounties-DEBUG] GUI Title with font tags: " + rawTitle);
+                }
                 PlayerGUInfo info = new PlayerGUInfo(finalPage, maxPage, name, data, displayItems, rawTitle);
                 Inventory inventory = gui.createInventory(player, finalPage, maxPage, displayItems, rawTitle, data);
 
