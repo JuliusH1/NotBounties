@@ -82,6 +82,15 @@ public class LanguageOptions {
         LEGACY_TO_MINI.put('r', "<reset>");
     }
 
+    private static boolean isMiniMessageTagStart(String str, int pos) {
+        if (pos >= str.length()) return false;
+        char first = str.charAt(pos);
+        if (first == '/') {
+            return pos + 1 < str.length() && (Character.isLetter(str.charAt(pos + 1)) || str.charAt(pos + 1) == '#');
+        }
+        return Character.isLetter(first) || first == '#' || first == '!';
+    }
+
     public static Component toComponent(String str) {
         if (str == null) return Component.empty();
 
@@ -94,8 +103,8 @@ public class LanguageOptions {
         while (i < len) {
             char c = str.charAt(i);
 
-            if (c == '<') {
-                int close = str.indexOf('>', i);
+            if (c == '<' && isMiniMessageTagStart(str, i + 1)) {
+                int close = str.indexOf('>', i + 1);
                 if (close != -1) {
                     sb.append(str, i, close + 1);
                     i = close + 1;
@@ -158,7 +167,7 @@ public class LanguageOptions {
     public static String parseRaw(String str, OfflinePlayer receiver) {
         if (receiver != null) {
             str = str.replace("{sort_type_name}", GUI.getActiveSortTypeName(receiver.getUniqueId()))
-                .replace("{sort_type}", GUI.getActiveSortType(receiver.getUniqueId()) + "");
+                    .replace("{sort_type}", GUI.getActiveSortType(receiver.getUniqueId()) + "");
         }
         if (str.contains("{time}")) {
             String timeString = formatTime(System.currentTimeMillis(), LocalTime.TimeFormat.PLAYER, receiver == null ? null : receiver.getPlayer());
@@ -209,7 +218,8 @@ public class LanguageOptions {
             mode = whitelist.isBlacklist() ? "false" : "true";
             str = str.replace("{mode_raw}", mode);
             String notification = playerData.getBroadcastSettings().toString();
-            str = str.replace("{notification}", escapeMiniMessage(notification)).replace("{immunity}", escapeMiniMessage(NumberFormatting.formatNumber(ImmunityManager.getImmunity(receiver.getUniqueId()))));
+            str = str.replace("{notification}", escapeMiniMessage(notification))
+                    .replace("{immunity}", escapeMiniMessage(NumberFormatting.formatNumber(ImmunityManager.getImmunity(receiver.getUniqueId()))));
 
             while (str.contains("{sort_type_") && str.substring(str.indexOf("{sort_type_")).contains("}")) {
                 String stringValue = str.substring(str.indexOf("{sort_type_") + 11, str.indexOf("{sort_type_") + str.substring(str.indexOf("{sort_type_")).indexOf("}"));
@@ -254,11 +264,39 @@ public class LanguageOptions {
             }
             // papi parse
             if (ConfigOptions.getIntegrations().isPapiEnabled()) {
-                str = new PlaceholderAPIClass().parse(receiver, str);
+                str = papiParseProtected(receiver, str);
             }
         }
 
         return str;
+    }
+
+    private static String papiParseProtected(OfflinePlayer receiver, String str) {
+        List<String> saved = new ArrayList<>();
+        StringBuilder masked = new StringBuilder(str.length());
+        int len = str.length();
+        int i = 0;
+        while (i < len) {
+            char c = str.charAt(i);
+            if (c == '<' && isMiniMessageTagStart(str, i + 1)) {
+                int close = str.indexOf('>', i + 1);
+                if (close != -1) {
+                    saved.add(str.substring(i, close + 1));
+                    masked.append('\u0000').append(saved.size() - 1).append('\u0000');
+                    i = close + 1;
+                    continue;
+                }
+            }
+            masked.append(c);
+            i++;
+        }
+
+        String parsed = new PlaceholderAPIClass().parse(receiver, masked.toString());
+
+        for (int k = 0; k < saved.size(); k++) {
+            parsed = parsed.replace("\u0000" + k + "\u0000", saved.get(k));
+        }
+        return parsed;
     }
 
     public static File getLanguageFile() {

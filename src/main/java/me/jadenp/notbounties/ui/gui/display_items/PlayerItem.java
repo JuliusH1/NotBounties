@@ -34,7 +34,7 @@ public class PlayerItem implements DisplayItem, AmountItem {
 
     @Override
     public ItemStack getFormattedItem(Player player, String headName, List<String> lore, int customModelData, String itemModel, String guiType) {
-        ItemStack item = HeadFetcher.getUnloadedHead(uuid);
+        ItemStack item = HeadFetcher.getUnloadedHead(uuid).clone();
         SkullMeta meta = (SkullMeta) item.getItemMeta();
         if (meta == null)
             return item;
@@ -49,12 +49,11 @@ public class PlayerItem implements DisplayItem, AmountItem {
                 .toList();
         meta.setLore(loreStrings);
 
-        // Note: Do NOT apply customModelData or itemModel to player skull items
-        // These override the player skin texture and break the skull display
-        // Player heads should display the actual player skin, not a custom texture
+        if (customModelData != -1)
             meta.setCustomModelData(customModelData);
         if (NotBounties.isAboveVersion(21, 3) && itemModel != null)
             meta.setItemModel(CustomItem.getItemModel(itemModel));
+
         item.setItemMeta(meta);
         return item;
     }
@@ -62,7 +61,8 @@ public class PlayerItem implements DisplayItem, AmountItem {
     @Override
     public String parseText(String text, Player player) {
         if (text.contains("{tax}") || text.contains("{amount_tax}")) {
-            double tax = amount * ConfigOptions.getMoney().getBountyTax() + DataManager.getPlayerData(player.getUniqueId()).getWhitelist().getList().size() * Whitelist.getCost();
+            double tax = amount * ConfigOptions.getMoney().getBountyTax()
+                    + DataManager.getPlayerData(player.getUniqueId()).getWhitelist().getList().size() * Whitelist.getCost();
             double total = amount + tax;
             text = text.replace("{tax}", NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(tax) + NumberFormatting.getCurrencySuffix())
                     .replace("{amount_tax}", NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(total) + NumberFormatting.getCurrencySuffix());
@@ -77,7 +77,13 @@ public class PlayerItem implements DisplayItem, AmountItem {
                 .replace("{leaderboard_name}", displayType.getDisplayName())
                 .replace("{items}", "")
                 .replace("{viewer}", LanguageOptions.getMessage("player-prefix") + player.getName() + LanguageOptions.getMessage("player-suffix"));
-        return LanguageOptions.parse(text, amount, time, LocalTime.TimeFormat.PLAYER, Bukkit.getOfflinePlayer(uuid));
+
+        if (text.contains("{time}")) {
+            String timeString = me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime.formatTime(time, LocalTime.TimeFormat.PLAYER, player);text = text.replace("{time}", timeString);
+        }
+        text = text.replace("{amount}", NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(amount) + NumberFormatting.getCurrencySuffix()).replace("{amount_plain}", NumberFormatting.formatNumber(amount));
+
+        return LanguageOptions.parseRaw(text, Bukkit.getOfflinePlayer(uuid));
     }
 
     public PlayerItem(UUID uuid, double amount, Leaderboard displayType, int index, long time, List<String> additionalLore) {

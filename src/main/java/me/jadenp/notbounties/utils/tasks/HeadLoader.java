@@ -44,7 +44,7 @@ public class HeadLoader extends CancelableTask{
             if (fetchedHeads[i] == null) {
                 ItemStack cachedHead = savedHeads.getIfPresent(queuedHead.uuid());
                 if (cachedHead != null) {
-                    fetchedHeads[i] = cachedHead;
+                    fetchedHeads[i] = copyItemText(queuedHead.itemStack(), cachedHead.clone());
                     headsToUpdate[i] = true;
                 } else {
                     if (SkinManager.isSkinLoaded(queuedHead.uuid())) {
@@ -52,9 +52,9 @@ public class HeadLoader extends CancelableTask{
                         ItemStack head = copyItemText(queuedHead.itemStack(), Head.createPlayerSkull(queuedHead.uuid(), playerSkin.url()));
                         fetchedHeads[i] = head;
                         if (!SkinManager.isMissingSkin(playerSkin)) {
-                            // do not update head if the skin is missing.
                             headsToUpdate[i] = true;
-                            savedHeads.put(queuedHead.uuid(), head);
+
+                            savedHeads.put(queuedHead.uuid(), Head.createPlayerSkull(queuedHead.uuid(), playerSkin.url()));
                         }
                     }
                 }
@@ -113,22 +113,27 @@ public class HeadLoader extends CancelableTask{
     }
 
     private ItemStack copyItemText(ItemStack from, ItemStack to) {
+        if (to == null) return from;
         ItemMeta fromMeta = from.getItemMeta();
         ItemMeta toMeta = to.getItemMeta();
         if (fromMeta == null || toMeta == null)
             return to;
 
-        if (NotBounties.isAboveVersion(21, 3)) {
-            if (fromMeta.hasItemModel()) {
-                toMeta.setItemModel(fromMeta.getItemModel());
-            }
-        } else if (fromMeta.hasCustomModelData()) {
-            toMeta.setCustomModelData(fromMeta.getCustomModelData());
-        }
         if (fromMeta.hasDisplayName())
             toMeta.setDisplayName(fromMeta.getDisplayName());
         if (fromMeta.hasLore())
             toMeta.setLore(fromMeta.getLore());
+
+        if (NotBounties.isAboveVersion(21, 3)) {
+            if (fromMeta.hasItemModel()) {
+                toMeta.setItemModel(fromMeta.getItemModel());
+            }
+        }
+
+        if (fromMeta.hasCustomModelData()) {
+            toMeta.setCustomModelData(fromMeta.getCustomModelData());
+        }
+
         to.setItemMeta(toMeta);
         return to;
     }

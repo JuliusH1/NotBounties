@@ -609,10 +609,6 @@ public class GUI implements Listener {
                 }
                 // createTitle now returns a raw string (with MiniMessage tags intact, no color() applied)
                 String rawTitle = createTitle(gui, player, finalPage, maxPage, displayItems, data);
-                // DEBUG: Log font tags for troubleshooting
-                if (rawTitle.contains("<font")) {
-                    Bukkit.getLogger().info("[NotBounties-DEBUG] GUI Title with font tags: " + rawTitle);
-                }
                 PlayerGUInfo info = new PlayerGUInfo(finalPage, maxPage, name, data, displayItems, rawTitle);
                 Inventory inventory = gui.createInventory(player, finalPage, maxPage, displayItems, rawTitle, data);
 
@@ -666,7 +662,12 @@ public class GUI implements Listener {
         } else {
             for (DisplayItem displayItem : displayItems) {
                 if (displayItem instanceof PlayerItem playerItem) {
-                    title = playerItem.parseText(title, viewer);
+                    String playerName = LoggedPlayers.getPlayerName(playerItem.getUuid());
+                    title = title.replace("{player}", LanguageOptions.escapeMiniMessage(playerName));
+                    title = title.replace("{amount}", LanguageOptions.escapeMiniMessage(
+                            NumberFormatting.getCurrencyPrefix()
+                                    + NumberFormatting.formatNumber(playerItem.getAmount())
+                                    + NumberFormatting.getCurrencySuffix()));
                     break;
                 }
             }
@@ -717,7 +718,7 @@ public class GUI implements Listener {
                 maxPage++;
             }
         }
-        return maxPage;
+        return Math.max(1, maxPage);
     }
 
 
