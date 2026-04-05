@@ -11,6 +11,7 @@ import me.jadenp.notbounties.ui.gui.CustomItem;
 import me.jadenp.notbounties.utils.DataManager;
 import me.jadenp.notbounties.utils.LoggedPlayers;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
@@ -58,6 +59,16 @@ public class PlayerItem implements DisplayItem, AmountItem {
 
     @Override
     public String parseText(String text, Player player) {
+        if (text.contains("{player_prefix}") || text.contains("{player_suffix}")) {
+            OfflinePlayer bountiedPlayer = Bukkit.getOfflinePlayer(uuid);
+            if (text.contains("{player_prefix}")) {
+                text = text.replace("{player_prefix}", LanguageOptions.escapeMiniMessage(LanguageOptions.getPlayerPrefix(bountiedPlayer)));
+            }
+            if (text.contains("{player_suffix}")) {
+                text = text.replace("{player_suffix}", LanguageOptions.escapeMiniMessage(LanguageOptions.getPlayerSuffix(bountiedPlayer)));
+            }
+        }
+
         if (text.contains("{tax}") || text.contains("{amount_tax}")) {
             double tax = amount * ConfigOptions.getMoney().getBountyTax()
                     + DataManager.getPlayerData(player.getUniqueId()).getWhitelist().getList().size() * Whitelist.getCost();

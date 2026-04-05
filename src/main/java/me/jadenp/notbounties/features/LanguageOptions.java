@@ -146,6 +146,99 @@ public class LanguageOptions {
         return str;
     }
 
+    private static net.luckperms.api.model.user.User loadLuckPermsUser(java.util.UUID uuid) {
+        try {
+            net.luckperms.api.LuckPerms api = net.luckperms.api.LuckPermsProvider.get();
+            net.luckperms.api.model.user.User cached = api.getUserManager().getUser(uuid);
+            if (cached != null) return cached;
+            return api.getUserManager().loadUser(uuid).get();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    public static String getPlayerPrefix(OfflinePlayer player) {
+        if (player == null) return "";
+        if (ConfigOptions.getIntegrations().isLuckPermsEnabled()) {
+            try {
+                net.luckperms.api.LuckPerms api = net.luckperms.api.LuckPermsProvider.get();
+                net.luckperms.api.model.user.User user = loadLuckPermsUser(player.getUniqueId());
+                if (user != null) {
+                    net.luckperms.api.query.QueryOptions queryOptions = api.getContextManager()
+                            .getQueryOptions(user)
+                            .orElse(net.luckperms.api.query.QueryOptions.nonContextual());
+                    String prefix = user.getCachedData().getMetaData(queryOptions).getPrefix();
+                    if (prefix != null) {
+                        if (prefix.contains("<gradient")) {
+                            return prefix;
+                        }
+                        return color(prefix);
+                    }
+                    net.luckperms.api.model.group.Group group = api.getGroupManager().getGroup(user.getPrimaryGroup());
+                    if (group != null) {
+                        String groupPrefix = group.getCachedData()
+                                .getMetaData(net.luckperms.api.query.QueryOptions.nonContextual())
+                                .getPrefix();
+                        if (groupPrefix != null) {
+                            if (groupPrefix.contains("<gradient")) {
+                                return groupPrefix;
+                            }
+                            return color(groupPrefix);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        if (ConfigOptions.getIntegrations().isPapiEnabled() && player.isOnline() && player.getPlayer() != null) {
+            try {
+                String result = new PlaceholderAPIClass().parse(player, "%vault_prefix%");
+                return result != null ? result : "";
+            } catch (Exception ignored) {}
+        }
+        return "";
+    }
+
+    public static String getPlayerSuffix(OfflinePlayer player) {
+        if (player == null) return "";
+        if (ConfigOptions.getIntegrations().isLuckPermsEnabled()) {
+            try {
+                net.luckperms.api.LuckPerms api = net.luckperms.api.LuckPermsProvider.get();
+                net.luckperms.api.model.user.User user = loadLuckPermsUser(player.getUniqueId());
+                if (user != null) {
+                    net.luckperms.api.query.QueryOptions queryOptions = api.getContextManager()
+                            .getQueryOptions(user)
+                            .orElse(net.luckperms.api.query.QueryOptions.nonContextual());
+                    String suffix = user.getCachedData().getMetaData(queryOptions).getSuffix();
+                    if (suffix != null) {
+                        if (suffix.contains("<gradient")) {
+                            return suffix;
+                        }
+                        return color(suffix);
+                    }
+                    net.luckperms.api.model.group.Group group = api.getGroupManager().getGroup(user.getPrimaryGroup());
+                    if (group != null) {
+                        String groupSuffix = group.getCachedData()
+                                .getMetaData(net.luckperms.api.query.QueryOptions.nonContextual())
+                                .getSuffix();
+                        if (groupSuffix != null) {
+                            if (groupSuffix.contains("<gradient")) {
+                                return groupSuffix;
+                            }
+                            return color(groupSuffix);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+        if (ConfigOptions.getIntegrations().isPapiEnabled() && player.isOnline() && player.getPlayer() != null) {
+            try {
+                String result = new PlaceholderAPIClass().parse(player, "%vault_suffix%");
+                return result != null ? result : "";
+            } catch (Exception ignored) {}
+        }
+        return "";
+    }
+
     /**
      * @param sender The recipient.
      * @param raw The raw (un-colored) string from parseRaw / getMessage.
@@ -185,6 +278,13 @@ public class LanguageOptions {
                 .replace("{time_immunity}", escapeMiniMessage(formatTime((long) (ImmunityManager.getTime() * 1000L), LocalTime.TimeFormat.RELATIVE)));
 
         if (receiver != null) {
+            if (str.contains("{player_prefix}")) {
+                str = str.replace("{player_prefix}", getPlayerPrefix(receiver));
+            }
+            if (str.contains("{player_suffix}")) {
+                str = str.replace("{player_suffix}", getPlayerSuffix(receiver));
+            }
+
             Bounty bounty = BountyManager.getBounty(receiver.getUniqueId());
             if (bounty != null) {
                 str = str.replace("{min_expire}", escapeMiniMessage(formatTime(BountyExpire.getLowestExpireTime(bounty), LocalTime.TimeFormat.RELATIVE)))
@@ -203,7 +303,8 @@ public class LanguageOptions {
             } else {
                 playerName = LoggedPlayers.getPlayerName(receiver);
             }
-            String playerDisplay = playerPrefix + escapeMiniMessage(playerName) + playerSuffix;
+            String suffix = getPlayerSuffix(receiver);
+            String playerDisplay = playerPrefix + escapeMiniMessage(playerName) + (suffix.contains("<gradient") ? "</gradient>" : "") + playerSuffix;
             str = str.replace("{player}", playerDisplay)
                     .replace("{receiver}", playerDisplay)
                     .replace("{viewer}", playerDisplay);
@@ -646,7 +747,7 @@ public class LanguageOptions {
                         .replace("{receiver}", getMessage("player-prefix") + receiver.getName() + getMessage("player-suffix"))
                         .replace("{viewer}", getMessage("player-prefix") + receiver.getName() + getMessage("player-suffix"));
             } else {
-                str = str.replace("{player}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-prefix"))
+                str = str.replace("{player}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-suffix"))
                         .replace("{receiver}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-suffix"))
                         .replace("{viewer}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-suffix"));
             }
