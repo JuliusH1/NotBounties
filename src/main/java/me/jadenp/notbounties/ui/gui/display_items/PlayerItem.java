@@ -1,15 +1,14 @@
 package me.jadenp.notbounties.ui.gui.display_items;
 
 import me.jadenp.notbounties.Leaderboard;
-import me.jadenp.notbounties.NotBounties;
 import me.jadenp.notbounties.data.Whitelist;
+import me.jadenp.notbounties.features.ConfigOptions;
+import me.jadenp.notbounties.features.LanguageOptions;
+import me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime;
+import me.jadenp.notbounties.features.settings.money.NumberFormatting;
 import me.jadenp.notbounties.ui.HeadFetcher;
 import me.jadenp.notbounties.ui.gui.CustomItem;
 import me.jadenp.notbounties.utils.DataManager;
-import me.jadenp.notbounties.features.ConfigOptions;
-import me.jadenp.notbounties.features.LanguageOptions;
-import me.jadenp.notbounties.features.settings.money.NumberFormatting;
-import me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime;
 import me.jadenp.notbounties.utils.LoggedPlayers;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -49,10 +48,9 @@ public class PlayerItem implements DisplayItem, AmountItem {
                 .toList();
         meta.setLore(loreStrings);
 
-        if (customModelData != -1)
-            meta.setCustomModelData(customModelData);
-        if (NotBounties.isAboveVersion(21, 3) && itemModel != null)
-            meta.setItemModel(CustomItem.getItemModel(itemModel));
+        // do NOT apply customModelData or itemModel to player skull items
+        // these override the player skin texture and break the skull display
+        // player heads should display the actual player skin not a custom texture
 
         item.setItemMeta(meta);
         return item;
@@ -79,7 +77,8 @@ public class PlayerItem implements DisplayItem, AmountItem {
                 .replace("{viewer}", LanguageOptions.getMessage("player-prefix") + player.getName() + LanguageOptions.getMessage("player-suffix"));
 
         if (text.contains("{time}")) {
-            String timeString = me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime.formatTime(time, LocalTime.TimeFormat.PLAYER, player);text = text.replace("{time}", timeString);
+            String timeString = me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime.formatTime(time, LocalTime.TimeFormat.PLAYER, player);
+            text = text.replace("{time}", timeString);
         }
         text = text.replace("{amount}", NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(amount) + NumberFormatting.getCurrencySuffix()).replace("{amount_plain}", NumberFormatting.formatNumber(amount));
 
