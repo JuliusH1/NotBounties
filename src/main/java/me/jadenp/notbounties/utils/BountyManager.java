@@ -1,34 +1,41 @@
 package me.jadenp.notbounties.utils;
 
-import me.jadenp.notbounties.data.*;
 import me.jadenp.notbounties.Leaderboard;
 import me.jadenp.notbounties.NotBounties;
 import me.jadenp.notbounties.bounty_events.BountyClaimEvent;
 import me.jadenp.notbounties.bounty_events.BountySetEvent;
+import me.jadenp.notbounties.data.Bounty;
+import me.jadenp.notbounties.data.PlayerStat;
+import me.jadenp.notbounties.data.Setter;
+import me.jadenp.notbounties.data.Whitelist;
 import me.jadenp.notbounties.data.player_data.AmountRefund;
 import me.jadenp.notbounties.data.player_data.ItemRefund;
 import me.jadenp.notbounties.data.player_data.PlayerData;
 import me.jadenp.notbounties.data.player_data.RewardHead;
+import me.jadenp.notbounties.features.ActionCommands;
+import me.jadenp.notbounties.features.ConfigOptions;
+import me.jadenp.notbounties.features.LanguageOptions;
+import me.jadenp.notbounties.features.PVPRestrictions;
 import me.jadenp.notbounties.features.settings.auto_bounties.BigBounty;
+import me.jadenp.notbounties.features.settings.auto_bounties.MurderBounties;
+import me.jadenp.notbounties.features.settings.auto_bounties.TimedBounties;
+import me.jadenp.notbounties.features.settings.auto_bounties.TrickleBounties;
 import me.jadenp.notbounties.features.settings.databases.proxy.ProxyDatabase;
 import me.jadenp.notbounties.features.settings.display.BountyHunt;
 import me.jadenp.notbounties.features.settings.display.BountyTracker;
 import me.jadenp.notbounties.features.settings.display.WantedTags;
 import me.jadenp.notbounties.features.settings.immunity.ImmunityManager;
 import me.jadenp.notbounties.features.settings.integrations.BountyClaimRequirements;
+import me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime;
+import me.jadenp.notbounties.features.settings.integrations.external_api.MMOLibClass;
 import me.jadenp.notbounties.features.settings.money.NotEnoughCurrencyException;
 import me.jadenp.notbounties.features.settings.money.NumberFormatting;
 import me.jadenp.notbounties.ui.Head;
 import me.jadenp.notbounties.ui.SkinManager;
+import me.jadenp.notbounties.ui.gui.CompatabilityUtils;
 import me.jadenp.notbounties.ui.gui.GUI;
-import me.jadenp.notbounties.features.settings.auto_bounties.TrickleBounties;
 import me.jadenp.notbounties.utils.tasks.BroadcastTask;
 import me.jadenp.notbounties.utils.tasks.DelayedReward;
-import me.jadenp.notbounties.features.*;
-import me.jadenp.notbounties.features.settings.auto_bounties.MurderBounties;
-import me.jadenp.notbounties.features.settings.auto_bounties.TimedBounties;
-import me.jadenp.notbounties.features.settings.integrations.external_api.LocalTime;
-import me.jadenp.notbounties.features.settings.integrations.external_api.MMOLibClass;
 import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.enchantments.Enchantment;
@@ -40,9 +47,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
 import java.util.*;
-
 
 import static me.jadenp.notbounties.features.LanguageOptions.*;
 import static me.jadenp.notbounties.features.settings.money.NumberFormatting.*;
@@ -291,10 +296,10 @@ public class BountyManager {
             ItemStack head = Head.createPlayerSkull(player.getUniqueId(), SkinManager.getSkin(player.getUniqueId()).url());
             ItemMeta headMeta = head.getItemMeta();
             assert headMeta != null;
-            headMeta.setDisplayName(LanguageOptions.parse(LanguageOptions.getMessage("any-kill-head-name"), player));
+            CompatabilityUtils.setDisplayName(headMeta, LanguageOptions.parse(LanguageOptions.getMessage("any-kill-head-name"), player));
             List<String> lore = new ArrayList<>();
             LanguageOptions.getListMessage("any-kill-head-lore").forEach(str -> lore.add(LanguageOptions.parse(str ,player)));
-            headMeta.setLore(lore);
+            CompatabilityUtils.setLore(headMeta, lore);
             head.setItemMeta(headMeta);
             droppedHead = player.getWorld().dropItemNaturally(player.getLocation(), head);
         }
@@ -533,13 +538,13 @@ public class BountyManager {
                         lore.add(parse(str.replace("{bounty}", (NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(rewardedBounty.getTotalBounty(killer)) + NumberFormatting.getCurrencySuffix())), Bukkit.getOfflinePlayer(setter.getUuid()),setter.getAmount(), player));
                     }
                     meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
-                    meta.setDisplayName(parse(getMessage("bounty-voucher-name").replace("{bounty}", (NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(rewardedBounty.getTotalBounty(killer)) + NumberFormatting.getCurrencySuffix())), killer, setter.getAmount(), player));
+                    CompatabilityUtils.setDisplayName(meta, parse(getMessage("bounty-voucher-name").replace("{bounty}", (NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(rewardedBounty.getTotalBounty(killer)) + NumberFormatting.getCurrencySuffix())), killer, setter.getAmount(), player));
                     ArrayList<String> setterLore = new ArrayList<>(lore);
                     if (!ConfigOptions.getMoney().getRedeemRewardLater().getSetterLoreAddition().isEmpty()) {
                         setterLore.add(parse(ConfigOptions.getMoney().getRedeemRewardLater().getSetterLoreAddition(), setter.getAmount(), Bukkit.getOfflinePlayer(setter.getUuid())));
                     }
                     setterLore.add(ChatColor.BLACK + "" + ChatColor.STRIKETHROUGH + ChatColor.UNDERLINE + ChatColor.ITALIC + "@" + setter.getAmount());
-                    meta.setLore(setterLore);
+                    CompatabilityUtils.setLore(meta, setterLore);
                     item.setItemMeta(meta);
                     item.addUnsafeEnchantment(Enchantment.CHANNELING, 0);
                     NumberFormatting.givePlayer(killer, item, 1);
@@ -555,7 +560,7 @@ public class BountyManager {
                     lore.add(parse(str, player.getKiller(), rewardedBounty.getTotalBounty(killer), player));
                 }
                 meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
-                meta.setDisplayName(parse(getMessage("bounty-voucher-name"), killer, rewardedBounty.getTotalBounty(killer), player));
+                CompatabilityUtils.setDisplayName(meta, parse(getMessage("bounty-voucher-name"), killer, rewardedBounty.getTotalBounty(killer), player));
                 if (!ConfigOptions.getMoney().getRedeemRewardLater().getSetterLoreAddition().isEmpty()) {
                     for (Setter setter : rewardedBounty.getSetters()) {
                         if (!setter.canClaim(killer) || setter.getAmount() <= 0.01 || (setter.getUuid().equals(DataManager.GLOBAL_SERVER_ID) && NumberFormatting.getManualEconomy() == NumberFormatting.ManualEconomy.PARTIAL))
@@ -564,7 +569,7 @@ public class BountyManager {
                     }
                 }
                 lore.add(ChatColor.BLACK + "" + ChatColor.STRIKETHROUGH + ChatColor.UNDERLINE + ChatColor.ITALIC + "@" + bounty.getTotalBounty(killer));
-                meta.setLore(lore);
+                CompatabilityUtils.setLore(meta, lore);
                 item.setItemMeta(meta);
                 item.addUnsafeEnchantment(Enchantment.CHANNELING, 0);
                 NumberFormatting.givePlayer(killer, item, 1);

@@ -7,6 +7,7 @@ import me.jadenp.notbounties.features.ConfigOptions;
 import me.jadenp.notbounties.features.LanguageOptions;
 import me.jadenp.notbounties.ui.Head;
 import me.jadenp.notbounties.utils.DataManager;
+import net.kyori.adventure.text.Component;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
@@ -22,8 +23,6 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
-import static me.jadenp.notbounties.features.LanguageOptions.parse;
 
 public class CustomItem {
     private final Material material;
@@ -117,7 +116,7 @@ public class CustomItem {
     }
 
     private String parseReplacements(String str, OfflinePlayer player, String[] replacements, String guiType) {
-        return parse(str.replace("{leaderboard}", replacements[0])
+        str = str.replace("{leaderboard}", replacements[0])
                 .replace("{leaderboard_name}", replacements[1])
                 .replace("{amount}", replacements[1])
                 .replace("{tax}", replacements[2])
@@ -128,7 +127,9 @@ public class CustomItem {
                 .replace("%notbounties_total_pages%", replacements[5])
                 .replace("{sort_type}", DataManager.getPlayerData(player.getUniqueId()).getGUISortType(guiType) + "")
                 .replace("{sort_type_name}", GUI.parseSortType(guiType, DataManager.getPlayerData(player.getUniqueId()).getGUISortType(guiType)))
-                .replace("{gui}", guiType), player);
+                .replace("{gui}", guiType);
+
+        return LanguageOptions.parseForItems(str, player);
     }
 
     public static String toDisplayString(String raw) {
@@ -170,15 +171,14 @@ public class CustomItem {
 
         if (name != null) {
             String parsedName = parseReplacements(name, player, replacements, guiType);
-            meta.setDisplayName(toDisplayString(parsedName));
+            Component displayNameComponent = LanguageOptions.toItemComponent(parsedName);
+            CompatabilityUtils.setDisplayNameComponent(meta, displayNameComponent);
         }
 
         if (!lore.isEmpty()) {
             String[] finalReplacements = replacements;
-            List<String> newLore = lore.stream()
-                    .map(s -> toDisplayString(parseReplacements(s, player, finalReplacements, guiType)))
-                    .toList();
-            meta.setLore(newLore);
+            List<Component> newLore = lore.stream().map(s -> LanguageOptions.toItemComponent(parseReplacements(s, player, finalReplacements, guiType))).toList();
+            CompatabilityUtils.setLoreComponents(meta, newLore);
         }
 
         if (customModelData != -1)

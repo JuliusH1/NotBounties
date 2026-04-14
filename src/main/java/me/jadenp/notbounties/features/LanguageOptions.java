@@ -815,10 +815,122 @@ public class LanguageOptions {
             }
         }
 
-        return color(str);
-    }
+         return color(str);
+     }
 
-    public static String parse(String str, long time, LocalTime.TimeFormat format, OfflinePlayer receiver) {
+     /**
+      * Parse placeholders for item names/lores while preserving MiniMessage tags.
+      * This is identical to parse() but uses colorPreservingMiniMessage() to avoid stripping tags.
+      */
+     public static String parseForItems(String str, OfflinePlayer receiver) {
+         if (receiver != null) {
+             str = str.replace("{sort_type_name}", GUI.getActiveSortTypeName(receiver.getUniqueId()))
+                     .replace("{sort_type}", GUI.getActiveSortType(receiver.getUniqueId()) + "");
+         }
+         if (str.contains("{time}")) {
+             String timeString = formatTime(System.currentTimeMillis(), LocalTime.TimeFormat.PLAYER, receiver.getPlayer());
+             str = str.replace("{time}", (timeString));
+         }
+         str = str.replace("{next_challenges}", formatTime(ChallengeManager.getNextChallengeChange() - System.currentTimeMillis(), LocalTime.TimeFormat.RELATIVE))
+                 .replace("{min_bounty}", (NumberFormatting.getValue(ConfigOptions.getMoney().getMinBounty())))
+                 .replace("{c_prefix}", (NumberFormatting.getCurrencyPrefix()))
+                 .replace("{c_suffix}", (NumberFormatting.getCurrencySuffix()))
+                 .replace("{whitelist_cost}", NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(Whitelist.getCost()) + NumberFormatting.getCurrencySuffix())
+                 .replace("{tax}", (NumberFormatting.formatNumber(ConfigOptions.getMoney().getBountyTax() * 100)))
+                 .replace("{buy_back_interest}", (NumberFormatting.formatNumber(ConfigOptions.getMoney().getBuyOwnCostMultiply() * 100)))
+                 .replace("{permanent_cost}", (NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(ImmunityManager.getPermanentCost()) + NumberFormatting.getCurrencySuffix()))
+                 .replace("{scaling_ratio}", (NumberFormatting.formatNumber(ImmunityManager.getScalingRatio())))
+                 .replace("{time_immunity}", (formatTime((long) (ImmunityManager.getTime() * 1000L), LocalTime.TimeFormat.RELATIVE)));
+
+         if (receiver != null) {
+             Bounty bounty = BountyManager.getBounty(receiver.getUniqueId());
+             if (bounty != null) {
+                 str = str.replace("{min_expire}", (formatTime(BountyExpire.getLowestExpireTime(bounty), LocalTime.TimeFormat.RELATIVE)))
+                         .replace("{max_expire}", (formatTime(BountyExpire.getHighestExpireTime(bounty), LocalTime.TimeFormat.RELATIVE)))
+                         .replace("{bounty}", NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(bounty.getTotalDisplayBounty()) + NumberFormatting.getCurrencySuffix())
+                         .replace("{bounty_value}", NumberFormatting.getValue(bounty.getTotalDisplayBounty()) );
+             } else {
+                 str = str.replace("{min_expire}", "");
+                 str = str.replace("{max_expire}", "");
+             }
+             if (receiver.getName() != null) {
+                 str = str.replace("{player}", getMessage("player-prefix") + receiver.getName() + getMessage("player-suffix"))
+                         .replace("{receiver}", getMessage("player-prefix") + receiver.getName() + getMessage("player-suffix"))
+                         .replace("{viewer}", getMessage("player-prefix") + receiver.getName() + getMessage("player-suffix"));
+             } else {
+                 str = str.replace("{player}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-suffix"))
+                         .replace("{receiver}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-suffix"))
+                         .replace("{viewer}", getMessage("player-prefix") + LoggedPlayers.getPlayerName(receiver) + getMessage("player-suffix"));
+             }
+             if (str.contains("{balance}"))
+                 str = str.replace("{balance}", (NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(NumberFormatting.getBalance(receiver)) + NumberFormatting.getCurrencySuffix()));
+             PlayerData playerData = DataManager.getPlayerData(receiver.getUniqueId());
+             Whitelist whitelist = playerData.getWhitelist();
+             str = str.replace("{whitelist}", (whitelist.toString()));
+             String mode = whitelist.isBlacklist() ? "Blacklist" : "Whitelist";
+             str = str.replace("{mode}", mode);
+             mode = whitelist.isBlacklist() ? "false" : "true";
+             str = str.replace("{mode_raw}", mode);
+             String notification = playerData.getBroadcastSettings().toString();
+             str = str.replace("{notification}", notification)
+                     .replace("{immunity}", NumberFormatting.formatNumber(ImmunityManager.getImmunity(receiver.getUniqueId())));
+
+             // {sort_type_(gui)} turns into the name of the sort type in the GUI
+             while (str.contains("{sort_type_") && str.substring(str.indexOf("{sort_type_")).contains("}")) {
+                 String stringValue = str.substring(str.indexOf("{sort_type_") + 11, str.indexOf("{sort_type_") + str.substring(str.indexOf("{sort_type_")).indexOf("}"));
+                 str = str.replace("{sort_type_" + stringValue + "}", GUI.parseSortType(stringValue, DataManager.getPlayerData(receiver.getUniqueId()).getGUISortType(stringValue)));
+             }
+
+             // {whitelist2} turns into the name of the second player in the receiver's whitelist
+             while (str.contains("{whitelist") && str.substring(str.indexOf("{whitelist")).contains("}")) {
+                 int num;
+                 String stringValue = str.substring(str.indexOf("{whitelist") + 10, str.indexOf("{whitelist") + str.substring(str.indexOf("{whitelist")).indexOf("}"));
+                 try {
+                     num = Integer.parseInt(stringValue);
+                 } catch (NumberFormatException e) {
+                     str = str.replace("{whitelist" + stringValue + "}", "<Error>");
+                     continue;
+                 }
+                 if (num < 1)
+                     num = 1;
+                 if (whitelist.getList().size() > num)
+                     str = str.replace("{whitelist" + stringValue + "}", "");
+                 else
+                     str = str.replace("{whitelist" + stringValue + "}", LoggedPlayers.getPlayerName(whitelist.getList().last()));
+             }
+             // parsing for GUI
+             if (receiver.isOnline() && GUI.playerInfo.containsKey(receiver.getUniqueId())) {
+                 PlayerGUInfo info = GUI.playerInfo.get(receiver.getUniqueId());
+                 str = str.replace("{page}", info.page() + "")
+                         .replace("{page_max}", info.maxPage() + "")
+                         .replace("{gui}", info.guiType());
+
+                 // check for {player<x>}
+                 while (str.contains("{player") && str.substring(str.indexOf("{player")).contains("}")) {
+                     String replacement = "";
+                     String slotString = str.substring(str.indexOf("{player") + 7, str.substring(str.indexOf("{player")).indexOf("}") + str.substring(0, str.indexOf("{player")).length());
+                     try {
+                         int slot = Integer.parseInt(slotString);
+                         if (info.displayItems().size() > slot-1 && info.displayItems().get(slot-1) instanceof PlayerItem playerItem) {
+                             replacement = LoggedPlayers.getPlayerName(playerItem.getUuid());
+                         }
+                     } catch (NumberFormatException e) {
+                         Bukkit.getLogger().warning("Error getting player in command: \n" + str);
+                     }
+                     str = str.replace(("{player" + slotString + "}"), (replacement));
+                 }
+             }
+             // papi parse
+             if (ConfigOptions.getIntegrations().isPapiEnabled()) {
+                 str = new PlaceholderAPIClass().parse(receiver, str);
+             }
+         }
+
+         // Use colorPreservingMiniMessage instead of color() to keep MiniMessage tags intact
+         return colorPreservingMiniMessage(str);
+     }
+
+     public static String parse(String str, long time, LocalTime.TimeFormat format, OfflinePlayer receiver) {
         if (str.contains("{time}")) {
             String timeString = formatTime(time, format, receiver.getPlayer());
             str = str.replace("{time}", (timeString));
@@ -903,6 +1015,40 @@ public class LanguageOptions {
         str = str.replace("{bounty}", (NumberFormatting.getCurrencyPrefix() + NumberFormatting.formatNumber(totalBounty) + NumberFormatting.getCurrencySuffix()));
         str = str.replace("{bounty_plain}", NumberFormatting.formatNumber(totalBounty));
         return parse(str, player, amount, receiver);
+    }
+
+    /**
+     * Converts hex color codes and legacy color codes to MiniMessage format while preserving existing MiniMessage tags.
+     * Used for item names/lores where MiniMessage formatting should be preserved for proper rendering.
+     *
+     * @param str The string with color codes and potentially MiniMessage tags
+     * @return The converted string with MiniMessage tags intact (not stripped)
+     */
+    public static String colorPreservingMiniMessage(String str){
+        // Convert legacy & codes to MiniMessage tags
+        str = str.replaceAll("&#([A-Fa-f0-9]{6})", "<#$1>");
+
+        // Handle legacy color codes by converting them to MiniMessage equivalents
+        StringBuilder sb = new StringBuilder(str.length());
+        int len = str.length();
+        int i = 0;
+        while (i < len) {
+            char c = str.charAt(i);
+
+            if ((c == '&' || c == '\u00a7') && i + 1 < len) {
+                char code = Character.toLowerCase(str.charAt(i + 1));
+                String tag = LEGACY_TO_MINI.get(code);
+                if (tag != null) {
+                    sb.append(tag);
+                    i += 2;
+                    continue;
+                }
+            }
+
+            sb.append(c);
+            i++;
+        }
+        return sb.toString();
     }
 
     public static String color(String str){
